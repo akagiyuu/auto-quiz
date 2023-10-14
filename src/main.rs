@@ -7,6 +7,8 @@ use anyhow::Result;
 use platform::{kahoot::Kahoot, Platform};
 use thirtyfour::prelude::*;
 
+use crate::answer_provider::gpt::GPT;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let caps = DesiredCapabilities::firefox();
@@ -22,7 +24,7 @@ async fn main() -> Result<()> {
         eprintln!("DEBUGPRINT[1]: main.rs:18: question={:#?}", question);
         let possible_answers = Kahoot::get_possible_answers(&driver).await?;
         eprintln!("DEBUGPRINT[2]: main.rs:22: possible_answers={:#?}", possible_answers);
-        let answer_index = Random::get_answer(&question, &possible_answers);
+        let answer_index = GPT::get_answer(&question, &possible_answers);
         eprintln!("DEBUGPRINT[3]: main.rs:24: answer_index={:#?}", answer_index);
         Kahoot::choose_answer(answer_index, &driver).await?;
     }

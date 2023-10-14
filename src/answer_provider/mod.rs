@@ -1,4 +1,4 @@
-pub mod chatgpt;
+pub mod gpt;
 pub mod random;
 
 pub trait AnswerProvider {

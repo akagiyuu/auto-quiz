@@ -12,3 +12,4 @@ tokio = { version = "1.32.0", features = ["full"] }
 selenium-manager = { git = "https://github.com/SeleniumHQ/selenium", branch = "trunk" }
 async-trait = "0.1.73"
 rand = "0.8.5"
+pyo3 = { version = "0.20.0", features = ["anyhow", "auto-initialize"] }
