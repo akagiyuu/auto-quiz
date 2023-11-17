@@ -8,8 +8,12 @@ edition = "2021"
 [dependencies]
 anyhow = "*"
 thirtyfour = "*"
-tokio = { version = "1.32.0", features = ["full"] }
+tokio = { version = "*", features = ["full"] }
 selenium-manager = { git = "https://github.com/SeleniumHQ/selenium", branch = "trunk" }
 async-trait = "*"
 rand = "*"
 pyo3 = { version = "*", features = ["anyhow", "auto-initialize"] }
+reqwest = { version = "*", features = ["json", "blocking"] }
+serde = { version = "*", features = ["derive"] }
+tracing-subscriber = "*"
+tracing = "*"

@@ -4,18 +4,20 @@ use pyo3::{
 };
 
 use super::AnswerProvider;
+use anyhow::Result;
 
+#[derive(Default)]
 pub struct GPT;
 
 impl AnswerProvider for GPT {
-    fn get_answer(question: &str, possible_answers: &[String]) -> usize {
+    async fn get_answer(&self, question: &str, possible_answers: &[String]) -> Result<usize> {
         let mut compact_question = String::from(question);
-        compact_question.push('?');
         for possible_answer in possible_answers {
             compact_question.push('\n');
             compact_question.push_str(possible_answer);
         }
-        let mut answer_index = Python::with_gil(|py| {
+
+        let mut answer = Python::with_gil(|py| {
             let g4f = PyModule::import(py, "g4f")?;
             let config = PyDict::new(py);
             config.set_item("role", "system")?;
@@ -31,12 +33,11 @@ impl AnswerProvider for GPT {
                 .getattr("create")?
                 .call((), Some(args))?;
             test.extract::<String>()
-        }).unwrap().parse::<usize>().unwrap();
+        })?.parse::<usize>()?;
 
-        if answer_index > 0 {
-            answer_index -= 1;
+        if answer > 0 {
+            answer -= 1;
         }
-        println!("Answer index: {}", answer_index);
-        answer_index
+        Ok(answer)
     }
 }

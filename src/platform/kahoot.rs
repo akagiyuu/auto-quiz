@@ -1,40 +1,44 @@
-use std::{
-    sync::Mutex,
-    time::Duration,
-};
+use std::time::Duration;
 
 use super::Platform;
 use anyhow::Result;
-use async_trait::async_trait;
-use std::sync::LazyLock;
 use thirtyfour::{prelude::ElementQueryable, By, WebDriver};
 
+pub struct Kahoot {
+    prev_question: String,
+    driver: WebDriver,
+}
+impl From<WebDriver> for Kahoot {
+    fn from(driver: WebDriver) -> Self {
+        Self {
+            prev_question: String::new(),
+            driver,
+        }
+    }
+}
 
-static QUESTION: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
-
-pub struct Kahoot;
-
-#[async_trait]
 impl Platform for Kahoot {
-    async fn get_question(driver: &WebDriver) -> Result<String> {
+    async fn get_question(&mut self) -> Result<String> {
         loop {
-            let question = driver
+            let question = self
+                .driver
                 .query(By::Css("span[data-functional-selector='block-title']"))
                 .wait(Duration::from_secs(600), Duration::from_secs(3))
                 .first()
                 .await?
                 .text()
                 .await?;
-            if question == *QUESTION.lock().unwrap() {
+            if question == self.prev_question {
                 continue;
             }
-            
-            *QUESTION.lock().unwrap() = question.clone();
-            return Ok(question);
-        };
+
+            self.prev_question = question;
+            break;
+        }
+        Ok(self.prev_question.clone())
     }
 
-    async fn get_possible_answers(driver: &WebDriver) -> Result<Vec<String>> {
+    async fn get_possible_answers(&self) -> Result<Vec<String>> {
         let mut i = 0usize;
         let mut posible_answers = vec![];
         loop {
@@ -42,7 +46,7 @@ impl Platform for Kahoot {
                 "span[data-functional-selector='question-choice-text-{}']",
                 i
             );
-            match driver.find(By::Css(css_selector.as_str())).await {
+            match self.driver.find(By::Css(css_selector.as_str())).await {
                 Err(_) => break,
                 Ok(answer_element) => {
                     posible_answers.push(answer_element.text().await?);
@@ -53,9 +57,9 @@ impl Platform for Kahoot {
         Ok(posible_answers)
     }
 
-    async fn choose_answer(index: usize, driver: &WebDriver) -> Result<()> {
+    async fn choose_answer(&self, index: usize) -> Result<()> {
         let css_selector = format!("button[data-functional-selector='answer-{}']", index);
-        let answer_button = driver.find(By::Css(css_selector.as_str())).await?;
+        let answer_button = self.driver.find(By::Css(css_selector.as_str())).await?;
         answer_button.click().await?;
         Ok(())
     }

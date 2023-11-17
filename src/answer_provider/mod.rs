@@ -1,6 +1,8 @@
 pub mod gpt;
 pub mod random;
+pub mod palm;
+use anyhow::Result;
 
 pub trait AnswerProvider {
-    fn get_answer(question: &str, possible_answers: &[String]) -> usize;
+    async fn get_answer(&self, question: &str, possible_answers: &[String]) -> Result<usize>;
 }

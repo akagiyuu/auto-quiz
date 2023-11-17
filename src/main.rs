@@ -1,35 +1,48 @@
 #![feature(lazy_cell)]
+#![feature(never_type)]
 mod answer_provider;
 mod platform;
 
-use answer_provider::{random::Random, AnswerProvider};
+use answer_provider::{palm::Palm, AnswerProvider};
 use anyhow::Result;
 use platform::{kahoot::Kahoot, Platform};
 use thirtyfour::prelude::*;
 
-use crate::answer_provider::gpt::GPT;
-
 #[tokio::main]
-async fn main() -> Result<()> {
-    let caps = DesiredCapabilities::firefox();
+async fn main() -> Result<!> {
+    tracing_subscriber::fmt::init();
 
-    let driver = WebDriver::new("http://127.0.0.1:4444", caps).await?;
-
+    let capabilities = DesiredCapabilities::firefox();
+    let driver = WebDriver::new("http://127.0.0.1:4444", capabilities).await?;
     driver.goto("https://kahoot.it").await?;
+
+    let palm = Palm::default();
+    let mut kahoot = Kahoot::from(driver);
     loop {
-        let Ok(question) = Kahoot::get_question(&driver).await else {
-            eprintln!("Get question error");
-            continue;
+        let question = match kahoot.get_question().await {
+            Ok(question) => question,
+            Err(error) => {
+                tracing::error!("Get question error: {}", error);
+                continue;
+            }
         };
-        eprintln!("DEBUGPRINT[1]: main.rs:18: question={:#?}", question);
-        let possible_answers = Kahoot::get_possible_answers(&driver).await?;
-        eprintln!("DEBUGPRINT[2]: main.rs:22: possible_answers={:#?}", possible_answers);
-        let answer_index = GPT::get_answer(&question, &possible_answers);
-        eprintln!("DEBUGPRINT[3]: main.rs:24: answer_index={:#?}", answer_index);
-        Kahoot::choose_answer(answer_index, &driver).await?;
+        let possible_answers = match kahoot.get_possible_answers().await {
+            Ok(question) => question,
+            Err(error) => {
+                tracing::error!("Get possible answers error: {}", error);
+                continue;
+            }
+        };
+        let answer = match palm.get_answer(&question, &possible_answers).await {
+            Ok(question) => question,
+            Err(error) => {
+                tracing::error!("Get answer error: {}", error);
+                continue;
+            }
+        };
+        if let Err(error) = kahoot.choose_answer(answer).await {
+            tracing::error!("Choose answer error: {}", error);
+            continue;
+        }
     }
-
-    // driver.quit().await?;
-
-    Ok(())
 }
