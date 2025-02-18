@@ -1,6 +1,7 @@
 // pub mod gpt;
 pub mod random;
 pub mod palm;
+pub mod ollama;
 use anyhow::Result;
 
 pub trait AnswerProvider {
