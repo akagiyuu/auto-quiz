@@ -1,19 +1,22 @@
-use std::time::Duration;
-
 use super::Platform;
-use anyhow::Result;
-use thirtyfour::{prelude::ElementQueryable, By, WebDriver};
+use anyhow::{anyhow, Result};
+use chromiumoxide::{Browser, Page};
+use futures::{stream::FuturesUnordered, TryStreamExt};
 
 pub struct Kahoot {
     prev_question: String,
-    driver: WebDriver,
+    page: Page,
 }
-impl From<WebDriver> for Kahoot {
-    fn from(driver: WebDriver) -> Self {
-        Self {
+
+impl Kahoot {
+    pub async fn new(browser: &Browser) -> Result<Self> {
+        let page = browser.new_page("about:blank").await?;
+        page.enable_stealth_mode().await?;
+        page.goto("https://kahoot.it").await?;
+        Ok(Self {
             prev_question: String::new(),
-            driver,
-        }
+            page,
+        })
     }
 }
 
@@ -21,13 +24,12 @@ impl Platform for Kahoot {
     async fn get_question(&mut self) -> Result<String> {
         loop {
             let question = self
-                .driver
-                .query(By::Css("span[data-functional-selector='block-title']"))
-                .wait(Duration::from_secs(600), Duration::from_secs(3))
-                .first()
+                .page
+                .find_element("span[data-functional-selector='block-title']")
                 .await?
-                .text()
-                .await?;
+                .inner_text()
+                .await?
+                .ok_or(anyhow!("No question"))?;
             if question == self.prev_question {
                 continue;
             }
@@ -39,27 +41,23 @@ impl Platform for Kahoot {
     }
 
     async fn get_possible_answers(&self) -> Result<Vec<String>> {
-        let mut i = 0usize;
-        let mut posible_answers = vec![];
-        loop {
-            let css_selector = format!(
-                "span[data-functional-selector='question-choice-text-{}']",
-                i
-            );
-            match self.driver.find(By::Css(css_selector.as_str())).await {
-                Err(_) => break,
-                Ok(answer_element) => {
-                    posible_answers.push(answer_element.text().await?);
-                }
-            }
-            i += 1;
-        }
-        Ok(posible_answers)
+        let elements = self
+            .page
+            .find_elements("span[data-functional-selector*='question-choice-text]")
+            .await?;
+        let possible_answers = elements
+            .into_iter()
+            .map(|element| async move { element.inner_text().await.map(|x| x.unwrap_or_default()) })
+            .collect::<FuturesUnordered<_>>()
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        Ok(possible_answers)
     }
 
     async fn choose_answer(&self, index: usize) -> Result<()> {
         let css_selector = format!("button[data-functional-selector='answer-{}']", index);
-        let answer_button = self.driver.find(By::Css(css_selector.as_str())).await?;
+        let answer_button = self.page.find_element(css_selector).await?;
         answer_button.click().await?;
         Ok(())
     }

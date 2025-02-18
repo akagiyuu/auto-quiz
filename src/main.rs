@@ -1,23 +1,30 @@
-#![feature(lazy_cell)]
-#![feature(never_type)]
 mod answer_provider;
 mod platform;
 
 use answer_provider::{palm::Palm, AnswerProvider};
 use anyhow::Result;
+use chromiumoxide::{Browser, BrowserConfig};
+use futures::StreamExt;
 use platform::{kahoot::Kahoot, Platform};
-use thirtyfour::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<!> {
+async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let capabilities = DesiredCapabilities::firefox();
-    let driver = WebDriver::new("http://127.0.0.1:4444", capabilities).await?;
-    driver.goto("https://kahoot.it").await?;
+    let (browser, mut handler) =
+        Browser::launch(BrowserConfig::builder().with_head().build().unwrap()).await?;
+
+    // spawn a new task that continuously polls the handler
+    tokio::task::spawn(async move {
+        while let Some(h) = handler.next().await {
+            if h.is_err() {
+                break;
+            }
+        }
+    });
 
     let palm = Palm::default();
-    let mut kahoot = Kahoot::from(driver);
+    let mut kahoot = Kahoot::new(&browser).await?;
     loop {
         let question = match kahoot.get_question().await {
             Ok(question) => question,
