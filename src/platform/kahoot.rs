@@ -1,7 +1,10 @@
+use std::time::Duration;
+
 use super::Platform;
 use anyhow::{anyhow, Result};
 use chromiumoxide::{Browser, Page};
 use futures::{stream::FuturesUnordered, TryStreamExt};
+use tokio::time::sleep;
 
 pub struct Kahoot {
     prev_question: String,
@@ -31,12 +34,14 @@ impl Platform for Kahoot {
                 .await?
                 .ok_or(anyhow!("No question"))?;
             if question == self.prev_question {
+                sleep(Duration::from_secs(1)).await;
                 continue;
             }
 
             self.prev_question = question;
             break;
         }
+
         Ok(self.prev_question.clone())
     }
 

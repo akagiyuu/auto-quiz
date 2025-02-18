@@ -19,3 +19,4 @@ chromiumoxide = { version = "0.7.0", default-features = false, features = ["toki
 futures = "0.3.31"
 ollama-rs = "0.2.5"
 itertools = "0.14.0"
+backon = "1.3.0"
