@@ -1,7 +1,7 @@
 mod answer_provider;
 mod platform;
 
-use answer_provider::{palm::Palm, AnswerProvider};
+use answer_provider::ollama;
 use anyhow::Result;
 use chromiumoxide::{Browser, BrowserConfig};
 use futures::StreamExt;
@@ -16,14 +16,11 @@ async fn main() -> Result<()> {
 
     // spawn a new task that continuously polls the handler
     tokio::task::spawn(async move {
-        while let Some(h) = handler.next().await {
-            if h.is_err() {
-                break;
-            }
+        loop {
+            let _ = handler.next().await;
         }
     });
 
-    let palm = Palm::default();
     let mut kahoot = Kahoot::new(&browser).await?;
     loop {
         let question = match kahoot.get_question().await {
@@ -40,7 +37,7 @@ async fn main() -> Result<()> {
                 continue;
             }
         };
-        let answer = match palm.get_answer(&question, &possible_answers).await {
+        let answer = match ollama::get_answer(&question, &possible_answers).await {
             Ok(question) => question,
             Err(error) => {
                 tracing::error!("Get answer error: {}", error);
